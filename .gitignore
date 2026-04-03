@@ -1,0 +1,32 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+lambda_src.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# AWS credentials
+.aws/
+credentials
+
+# Installed packages (唔需要 commit)
+lambda_src/requests/
+lambda_src/certifi/
+lambda_src/charset_normalizer/
+lambda_src/idna/
+lambda_src/urllib3/
+lambda_src/*.dist-info/
+
+# Compiled binaries
+lambda_src/*.so
+lambda_src/bin/
+
+# Terraform plan output
+plan_output.txt
