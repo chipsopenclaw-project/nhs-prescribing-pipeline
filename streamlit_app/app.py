@@ -1,26 +1,40 @@
 # =============================================
 # streamlit_app/app.py
 # NHS Prescribing Data Dashboard
-# Connects to AWS Athena to query Gold tables
 # =============================================
 
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 from pyathena import connect
 from pyathena.pandas.cursor import PandasCursor
 
-# ---------------------------
-# Page config
-# ---------------------------
 st.set_page_config(
     page_title="NHS Prescribing Dashboard",
-    page_icon="",
+    page_icon="🏥",
     layout="wide"
 )
 
 # ---------------------------
-# AWS Athena connection
+# AWS credentials
+# Works both locally and on Streamlit Cloud
+# ---------------------------
+def setup_aws_credentials():
+    try:
+        # Streamlit Cloud: read from secrets
+        aws_secrets = st.secrets["aws"]
+        os.environ["AWS_ACCESS_KEY_ID"]     = aws_secrets["AWS_ACCESS_KEY_ID"]
+        os.environ["AWS_SECRET_ACCESS_KEY"] = aws_secrets["AWS_SECRET_ACCESS_KEY"]
+        os.environ["AWS_DEFAULT_REGION"]    = aws_secrets["AWS_DEFAULT_REGION"]
+    except Exception:
+        # Local: use AWS profile (already set via export AWS_PROFILE=terraform)
+        pass
+
+setup_aws_credentials()
+
+# ---------------------------
+# Athena connection
 # ---------------------------
 @st.cache_resource
 def get_connection():
@@ -40,7 +54,7 @@ def run_query(query: str) -> pd.DataFrame:
 # ---------------------------
 # Header
 # ---------------------------
-st.title("NHS Prescribing Data Dashboard")
+st.title("🏥 NHS Prescribing Data Dashboard")
 st.markdown("Monthly prescribing data for England — Source: NHS BSA Open Data Portal")
 st.divider()
 
@@ -79,8 +93,8 @@ total_query = f"""
         SUM(total_cost)  AS total_cost,
         COUNT(DISTINCT practice_code) AS total_practices
     FROM ukb_dev_nhs_prescribing_db.practice_summary
-    WHERE cast(year as varchar) = '{selected_year}'
-    AND cast(month as varchar) = '{selected_month}'
+    WHERE cast(year as varchar)  = '{selected_year}'
+    AND   cast(month as varchar) = '{selected_month}'
 """
 
 try:
@@ -103,26 +117,24 @@ except Exception as e:
 st.divider()
 
 # ---------------------------
-# Chart 1: Top 10 drugs by cost
+# Chart 1 & 2
 # ---------------------------
 col_left, col_right = st.columns(2)
 
 with col_left:
     st.subheader("Top 10 Drugs by Cost")
-
     drug_query = f"""
         SELECT
             bnf_description,
             SUM(total_cost)  AS total_cost,
             SUM(total_items) AS total_items
         FROM ukb_dev_nhs_prescribing_db.drug_summary
-        WHERE cast(year as varchar) = '{selected_year}'
-        AND cast(month as varchar) = '{selected_month}'
+        WHERE cast(year as varchar)  = '{selected_year}'
+        AND   cast(month as varchar) = '{selected_month}'
         GROUP BY bnf_description
         ORDER BY total_cost DESC
         LIMIT 10
     """
-
     try:
         drug_df = run_query(drug_query)
         fig = px.bar(
@@ -130,10 +142,7 @@ with col_left:
             x="total_cost",
             y="bnf_description",
             orientation="h",
-            labels={
-                "total_cost"      : "Total Cost (£)",
-                "bnf_description" : "Drug"
-            },
+            labels={"total_cost": "Total Cost (£)", "bnf_description": "Drug"},
             color="total_cost",
             color_continuous_scale="Blues"
         )
@@ -146,24 +155,19 @@ with col_left:
     except Exception as e:
         st.error(f"Error loading drug data: {e}")
 
-# ---------------------------
-# Chart 2: Top 10 regions by cost
-# ---------------------------
 with col_right:
     st.subheader("Cost by Region")
-
     regional_query = f"""
         SELECT
             regional_office_name,
             SUM(total_cost)  AS total_cost,
             SUM(total_items) AS total_items
         FROM ukb_dev_nhs_prescribing_db.regional_trend
-        WHERE cast(year as varchar) = '{selected_year}'
-        AND cast(month as varchar) = '{selected_month}'
+        WHERE cast(year as varchar)  = '{selected_year}'
+        AND   cast(month as varchar) = '{selected_month}'
         GROUP BY regional_office_name
         ORDER BY total_cost DESC
     """
-
     try:
         regional_df = run_query(regional_query)
         fig2 = px.pie(
@@ -180,7 +184,7 @@ with col_right:
 st.divider()
 
 # ---------------------------
-# Chart 3: Top 10 GP Practices by cost
+# Chart 3: Top 10 GP Practices
 # ---------------------------
 st.subheader("Top 10 GP Practices by Cost")
 
@@ -191,8 +195,8 @@ practice_query = f"""
         SUM(total_cost)  AS total_cost,
         SUM(total_items) AS total_items
     FROM ukb_dev_nhs_prescribing_db.practice_summary
-    WHERE cast(year as varchar) = '{selected_year}'
-    AND cast(month as varchar) = '{selected_month}'
+    WHERE cast(year as varchar)  = '{selected_year}'
+    AND   cast(month as varchar) = '{selected_month}'
     GROUP BY practice_name, practice_code
     ORDER BY total_cost DESC
     LIMIT 10
@@ -204,10 +208,7 @@ try:
         practice_df,
         x="practice_name",
         y="total_cost",
-        labels={
-            "total_cost"    : "Total Cost (£)",
-            "practice_name" : "GP Practice"
-        },
+        labels={"total_cost": "Total Cost (£)", "practice_name": "GP Practice"},
         color="total_cost",
         color_continuous_scale="Greens"
     )
@@ -223,7 +224,7 @@ except Exception as e:
 st.divider()
 
 # ---------------------------
-# Raw data table
+# Raw data
 # ---------------------------
 st.subheader("Raw Data: Top 20 Practices")
 
@@ -238,8 +239,8 @@ if st.checkbox("Show raw data"):
                 total_nic,
                 avg_cost_per_item
             FROM ukb_dev_nhs_prescribing_db.practice_summary
-            WHERE year  = {selected_year}
-            AND cast(month as varchar) = '{selected_month}'
+            WHERE cast(year as varchar)  = '{selected_year}'
+            AND   cast(month as varchar) = '{selected_month}'
             ORDER BY total_cost DESC
             LIMIT 20
         """

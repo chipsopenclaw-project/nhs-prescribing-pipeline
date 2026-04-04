@@ -30,3 +30,6 @@ lambda_src/bin/
 
 # Terraform plan output
 plan_output.txt
+
+# Streamlit secrets
+.streamlit/secrets.toml
