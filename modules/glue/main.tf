@@ -156,6 +156,23 @@ resource "aws_glue_job" "silver_to_gold" {
   number_of_workers = 2
 }
 
+# Gold Crawler - scans Gold bucket for Athena tables
+resource "aws_glue_crawler" "gold" {
+  name          = "${local.prefix}-glue-nhs-gold-crawler"
+  role          = var.glue_role_arn
+  database_name = aws_glue_catalog_database.nhs.name
+  description   = "Crawls NHS Gold Parquet and creates Athena tables"
+
+  s3_target {
+    path = "s3://${var.gold_bucket_name}/prescribing/gold/"
+  }
+
+  schema_change_policy {
+    update_behavior = "UPDATE_IN_DATABASE"
+    delete_behavior = "LOG"
+  }
+}
+
 # ---------------------------
 # Glue Workflow
 # Orchestrates: api_to_bronze -> crawler -> bronze_to_silver -> silver_to_gold
